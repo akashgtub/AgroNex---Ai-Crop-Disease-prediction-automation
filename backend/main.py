@@ -1,0 +1,31 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from api import crops, assistant, profile, auth, weather, schemes
+from config.database import Base, engine
+import os
+
+# Create database tables
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="AgroNex API", description="Smart Farming Backend", version="1.0.0")
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(crops.router, prefix="/api/crops", tags=["Crops"])
+app.include_router(assistant.router, prefix="/api/assistant", tags=["AI Assistant"])
+app.include_router(weather.router, prefix="/api/weather", tags=["Weather"])
+app.include_router(schemes.router, prefix="/api/schemes", tags=["Schemes"])
+app.include_router(profile.router, prefix="/api/profile", tags=["Profile"])
+
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to AgroNex API"}
