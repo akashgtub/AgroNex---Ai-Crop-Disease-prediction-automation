@@ -127,6 +127,11 @@ export default function Weather() {
           </div>
         ) : weather && weather.current ? (
           <>
+            <div className="mb-2 text-right">
+              <span className="text-xs font-medium text-gray-400">
+                Last updated: {new Date(weather.last_updated).toLocaleString()}
+              </span>
+            </div>
             {/* Current Weather Card */}
             <div className="bg-gradient-to-br from-agronex-primary to-green-700 rounded-3xl p-6 text-white shadow-md mb-6 relative overflow-hidden">
               <div className="relative z-10 flex justify-between items-end">
@@ -153,6 +158,34 @@ export default function Weather() {
               
               <CloudSun size={180} className="absolute -bottom-10 -right-10 opacity-10 pointer-events-none" />
             </div>
+
+            {/* Today Hourly Forecast */}
+            {weather.hourly && weather.hourly.length > 0 && (
+              <>
+                <h3 className="font-black text-lg text-agronex-deep mb-3">
+                  {isTamil ? "இன்று" : "Today"}
+                </h3>
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
+                  {/* Select next 4 points spacing them out */}
+                  {[weather.hourly[0], weather.hourly[4], weather.hourly[8], weather.hourly[12]].filter(Boolean).map((hourData, idx) => {
+                    const timeObj = new Date(hourData.time);
+                    const timeStr = timeObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    return (
+                      <div key={idx} className="flex items-center justify-between p-4 border-b border-gray-50 last:border-0">
+                        <span className="w-20 font-bold text-gray-700">{timeStr}</span>
+                        <div className="flex-grow flex items-center justify-center gap-2 text-blue-500 font-medium text-sm">
+                          <CloudRain size={16} />
+                          {hourData.precipitation_probability}% {isTamil ? "மழை" : "rain"}
+                        </div>
+                        <div className="w-16 text-right font-bold text-gray-800">
+                          {Math.round(hourData.temperature)}°C
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
 
             {/* Agricultural Weather Alerts */}
             <h3 className="font-black text-lg text-agronex-deep mb-3 flex items-center gap-2">
@@ -184,8 +217,12 @@ export default function Weather() {
                     <CloudSun size={20} />
                   </div>
                   <div>
-                    <h4 className="font-bold text-green-800">No Significant Alerts</h4>
-                    <p className="text-sm text-green-600 font-medium">Weather is optimal for farming.</p>
+                    <h4 className="font-bold text-green-800">
+                      {isTamil ? "தற்போது குறிப்பிடத்தக்க வானிலை எச்சரிக்கைகள் இல்லை." : "✓ No significant weather alerts currently."}
+                    </h4>
+                    <p className="text-sm text-green-600 font-medium">
+                      {isTamil ? "தற்போதைய வானிலை பெரிய அபாயங்களை காட்டவில்லை." : "Current weather conditions do not indicate any major weather risk."}
+                    </p>
                   </div>
                 </div>
               )}

@@ -3,6 +3,7 @@ import urllib.request
 import urllib.parse
 import urllib.error
 from typing import Dict, Any, Tuple
+from datetime import datetime
 from services.weather_alert_service import WeatherAlertService
 
 class WeatherService:
@@ -31,6 +32,7 @@ class WeatherService:
                 data = json.loads(response.read().decode())
                 
             current = data.get("current", {})
+            hourly = data.get("hourly", {})
             daily = data.get("daily", {})
             alerts = self.alert_service.generate_alerts(data, crop, condition)
 
@@ -59,6 +61,18 @@ class WeatherService:
                         "temperature_min": daily["temperature_2m_min"][i],
                         "precipitation_probability_mean": daily["precipitation_probability_max"][i],
                     })
+                    
+            # Format 24-hour forecast
+            hourly_forecast = []
+            if "time" in hourly:
+                # Get current time string from Open-Meteo or use now
+                # Open-Meteo hourly times are ISO8601, we want the next 24 items
+                for i in range(min(24, len(hourly["time"]))):
+                    hourly_forecast.append({
+                        "time": hourly["time"][i],
+                        "temperature": hourly["temperature_2m"][i],
+                        "precipitation_probability": hourly["precipitation_probability"][i],
+                    })
             
             return {
                 "success": True,
@@ -66,6 +80,7 @@ class WeatherService:
                     "latitude": lat,
                     "longitude": lon
                 },
+                "last_updated": current.get("time", datetime.now().isoformat()),
                 "condition_en": condition_en,
                 "condition_ta": condition_ta,
                 "current": {
@@ -75,6 +90,7 @@ class WeatherService:
                     "precipitation": current.get("precipitation"),
                     "weather_code": code
                 },
+                "hourly": hourly_forecast,
                 "forecast": forecast,
                 "alerts": alerts
             }
