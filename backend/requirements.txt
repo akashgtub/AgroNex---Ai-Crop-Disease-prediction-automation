@@ -10,3 +10,4 @@ Pillow
 onnxruntime
 email-validator
 supabase
+scikit-learn
