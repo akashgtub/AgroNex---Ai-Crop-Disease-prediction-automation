@@ -101,3 +101,28 @@ Running evaluation generates:
 1. **Console Summary**: Clean summary tables showing global metrics, confidence distribution, and top classes by support.
 2. **`evaluation_results.json`**: Complete structured JSON report containing metadata, metrics, calibration bins, latency percentiles, and the full $38 \times 38$ confusion matrix.
 3. **`per_class_metrics.csv`**: Tabular CSV report with precision, recall, F1, support, TP, FP, FN, and TN for every class.
+
+---
+
+## 6. Standard AgroNex Benchmarks
+
+### Benchmark A: PlantVillage In-Distribution Sanity Subset (`plantvillage_sanity_manifest.csv`)
+- **Purpose**: Verifies model prediction sanity across all 38 supported classes using 5 studio images per class (190 total images).
+- **Scope**: In-distribution pipeline sanity check only; **not** a field generalization benchmark.
+- **Run command**:
+  ```bash
+  python backend/evaluation/evaluate.py --data-path backend/evaluation/manifests/plantvillage_sanity_manifest.csv --mode direct
+  ```
+
+### Benchmark B: PlantDoc External Field Generalization Test Set (`plantdoc_test_manifest.csv`)
+- **Purpose**: Evaluates model performance on complex, outdoor field imagery with variable lighting, shadows, and natural foliage.
+- **Scope**: Official PlantDoc test split (236 images across 27 mapped classes; 11 classes unrepresented in PlantDoc).
+- **Attribution & License**: PlantDoc dataset by Singh et al. (2019), licensed under Creative Commons Attribution 4.0 International (CC-BY 4.0).
+- **Run command (Production Baseline)**:
+  ```bash
+  python backend/evaluation/evaluate.py --data-path backend/evaluation/manifests/plantdoc_test_manifest.csv --mode direct
+  ```
+- **Run command (Strategy Comparison)**:
+  ```bash
+  python backend/evaluation/evaluate.py --data-path backend/evaluation/manifests/plantdoc_test_manifest.csv --compare-all
+  ```

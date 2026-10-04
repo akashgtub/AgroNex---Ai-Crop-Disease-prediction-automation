@@ -19,3 +19,21 @@ build/
 .DS_Store
 
 *.log
+
+# Evaluation dataset files
+backend/evaluation/data/
+evaluation_results.json
+per_class_metrics.csv
+backend/evaluation/results/
+
+# Phase 4C experimental training data and checkpoints
+backend/training/phase4c/data/
+backend/training/phase4c/checkpoints/
+
+# Model backups
+*.bak
+backend/models/*.bak
+
+# Local databases and uploads
+*.db
+uploads/
