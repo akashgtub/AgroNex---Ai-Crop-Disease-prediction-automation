@@ -21,8 +21,17 @@ class WeatherAlertService:
         temps = hourly.get("temperature_2m", [])
         humidities = hourly.get("relative_humidity_2m", [])
         
-        # Only check the first 24 hours
-        check_hours = min(24, len(times))
+        # Only check the next 24 hours starting from current hour
+        current = forecast.get("current", {})
+        current_time_str = current.get("time", "")[:13]
+        
+        start_idx = 0
+        for i, t in enumerate(times):
+            if t.startswith(current_time_str) or t > current_time_str:
+                start_idx = i
+                break
+                
+        check_hours = min(start_idx + 24, len(times))
         
         def get_time_of_day(iso_time_str):
             if not iso_time_str:
@@ -54,7 +63,7 @@ class WeatherAlertService:
         max_rain_prob = 0
         max_rain_prob_time = None
         
-        for i in range(check_hours):
+        for i in range(start_idx, check_hours):
             if precip_probs and precip_probs[i] > max_rain_prob:
                 max_rain_prob = precip_probs[i]
                 max_rain_prob_time = times[i]
@@ -67,8 +76,8 @@ class WeatherAlertService:
                 "level": "HIGH",
                 "title_en": "High Chance of Rain",
                 "title_ta": "மழை பெய்ய அதிக வாய்ப்பு உள்ளது",
-                "message_en": f"Rain is likely around {tod_en}. Consider planning irrigation and field activities accordingly.",
-                "message_ta": f"{tod_ta} நேரத்தில் மழை பெய்ய வாய்ப்புள்ளது. அதற்கேற்ப நீர்ப்பாசனம் மற்றும் களப்பணிகளைத் திட்டமிடுங்கள்.",
+                "message_en": f"Rain probability reaches {max_rain_prob}% during the forecast period. Consider planning irrigation and field activities accordingly.",
+                "message_ta": f"முன்னறிவிப்பு காலத்தில் மழை வாய்ப்பு {max_rain_prob}% ஐ எட்டும். அதற்கேற்ப நீர்ப்பாசனம் மற்றும் களப்பணிகளைத் திட்டமிடுங்கள்.",
                 "start": max_rain_prob_time,
                 "probability": max_rain_prob,
                 "source": "Open-Meteo forecast"
@@ -78,7 +87,7 @@ class WeatherAlertService:
         storm_detected = False
         storm_time = None
         has_hail = False
-        for i in range(check_hours):
+        for i in range(start_idx, check_hours):
             code = weather_codes[i] if weather_codes else 0
             if code in [95, 96, 99]:
                 storm_detected = True

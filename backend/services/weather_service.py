@@ -62,12 +62,18 @@ class WeatherService:
                         "precipitation_probability_mean": daily["precipitation_probability_max"][i],
                     })
                     
-            # Format 24-hour forecast
+            # Format 24-hour forecast starting from current hour
             hourly_forecast = []
             if "time" in hourly:
-                # Get current time string from Open-Meteo or use now
-                # Open-Meteo hourly times are ISO8601, we want the next 24 items
-                for i in range(min(24, len(hourly["time"]))):
+                current_time_str = current.get("time", "")[:13] # e.g. "2026-10-04T20"
+                start_idx = 0
+                for i, t in enumerate(hourly["time"]):
+                    if t.startswith(current_time_str) or t > current_time_str:
+                        start_idx = i
+                        break
+                        
+                end_idx = min(start_idx + 24, len(hourly["time"]))
+                for i in range(start_idx, end_idx):
                     hourly_forecast.append({
                         "time": hourly["time"][i],
                         "temperature": hourly["temperature_2m"][i],

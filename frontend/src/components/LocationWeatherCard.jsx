@@ -55,7 +55,7 @@ export default function LocationWeatherCard() {
 
   const current = weather?.current;
   const today = weather?.forecast?.[0];
-  const rainChance = today ? Math.max(...weather.forecast.map(d => d.precipitation_probability_mean || 0)) : 0;
+  const rainChance = today ? (today.precipitation_probability_mean || 0) : 0;
 
   return (
     <div className="relative rounded-3xl p-6 shadow-sm border border-emerald-100 bg-gradient-to-br from-emerald-50/90 via-teal-50/50 to-green-50/80 overflow-hidden">
@@ -127,7 +127,14 @@ export default function LocationWeatherCard() {
           </Link>
         </div>
       ) : (
-        <p className="text-red-500 text-sm font-medium py-2">Weather data temporarily unavailable</p>
+        <div className="text-center py-4">
+          <p className="text-red-500 font-bold mb-1">
+            {isTamil ? "நேரடி வானிலைத் தரவைப் பெற முடியவில்லை." : "Unable to fetch live weather data."}
+          </p>
+          <p className="text-red-400 text-sm">
+            {isTamil ? "தரவு இல்லை" : "Data unavailable"}
+          </p>
+        </div>
       )}
 
       {/* Decorative background sun icon */}
