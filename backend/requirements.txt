@@ -12,3 +12,4 @@ email-validator
 supabase
 scikit-learn
 google-auth
+requests
