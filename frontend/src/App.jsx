@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import CropCheck from './pages/CropCheck';
 import Result from './pages/Result';
 import Assistant from './pages/Assistant';
+import Weather from './pages/Weather';
 import './i18n/i18n';
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
           <Route path="crop" element={<CropCheck />} />
           <Route path="result" element={<Result />} />
           <Route path="assistant" element={<Assistant />} />
+          <Route path="weather" element={<Weather />} />
           {/* Add more routes here */}
           <Route path="*" element={<Dashboard />} />
         </Route>

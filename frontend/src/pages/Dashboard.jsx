@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Camera, Upload, Leaf, Bot, FileText, CloudSun } from 'lucide-react';
-import WeatherAlerts from '../components/WeatherAlerts';
+import LocationWeatherCard from '../components/LocationWeatherCard';
 
 export default function Dashboard() {
   const { t } = useTranslation();
@@ -56,8 +56,8 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Weather Alerts */}
-      <WeatherAlerts />
+      {/* Weather Card */}
+      <LocationWeatherCard />
     </div>
   );
 }
