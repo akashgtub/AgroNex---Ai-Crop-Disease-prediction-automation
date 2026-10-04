@@ -71,33 +71,45 @@ export default function Weather() {
   };
 
   return (
-    <div className="pb-24 max-w-lg mx-auto">
+    <div className="pb-16 max-w-2xl mx-auto space-y-6">
       {/* Header */}
-      <div className="bg-white px-4 py-4 sticky top-0 z-50 shadow-sm flex items-center gap-3">
-        <Link to="/dashboard" className="p-2 -ml-2 bg-gray-50 rounded-full text-agronex-deep hover:bg-gray-100 transition-colors">
-          <ChevronLeft size={24} />
+      <div className="flex items-center justify-between">
+        <Link 
+          to="/dashboard" 
+          className="inline-flex items-center text-xs font-bold text-gray-500 hover:text-agronex-deep transition-colors bg-white px-3 py-1.5 rounded-full border border-gray-100 shadow-xs"
+        >
+          <ChevronLeft size={16} className="mr-0.5" />
+          <span>{isTamil ? "முகப்பு" : "Dashboard"}</span>
         </Link>
-        <h1 className="text-xl font-black text-agronex-deep flex-grow">
-          {isTamil ? "வானிலை விவரங்கள்" : "Weather Details"}
+        <h1 className="text-xl font-extrabold text-agronex-deep font-display">
+          {isTamil ? "பண்ணை வானிலை முன்னறிவிப்பு" : "Farm Weather Radar"}
         </h1>
+        <div className="w-16"></div>
       </div>
 
-      <div className="px-4 mt-6">
+      <div>
         {/* Location Section */}
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 mb-6">
+        <div className="bg-white rounded-3xl p-5 shadow-xs border border-gray-100 mb-5">
           {!searchMode ? (
             <div className="flex justify-between items-center">
-              <div className="flex items-start gap-3">
-                <MapPin className="text-green-600 mt-1" size={24} />
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                  <MapPin size={20} />
+                </div>
                 <div>
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Location</p>
-                  <h3 className="font-bold text-lg text-agronex-deep">
-                    {locLoading ? "Detecting..." : location ? `${location.city}, ${location.state}` : "Unknown"}
+                  <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">
+                    {isTamil ? "கண்காணிக்கப்படும் பண்ணை" : "MONITORED LOCATION"}
+                  </p>
+                  <h3 className="font-bold text-base text-agronex-deep">
+                    {locLoading ? "Detecting location..." : location ? `${location.city}, ${location.state}` : "Unknown"}
                   </h3>
                 </div>
               </div>
-              <button onClick={() => setSearchMode(true)} className="text-sm font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-lg">
-                Change
+              <button 
+                onClick={() => setSearchMode(true)} 
+                className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/50 px-3.5 py-2 rounded-xl transition-all"
+              >
+                {isTamil ? "மாற்று" : "Change City"}
               </button>
             </div>
           ) : (
@@ -106,151 +118,195 @@ export default function Weather() {
                 type="text" 
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search city..." 
-                className="flex-grow bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder={isTamil ? "நகரத்தின் பெயரை தட்டச்சு செய்க..." : "Search Indian city or district..."} 
+                className="flex-grow bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 autoFocus
               />
-              <button type="submit" className="bg-green-600 text-white p-2 rounded-xl">
-                <Search size={20} />
+              <button 
+                type="submit" 
+                className="bg-agronex-primary hover:bg-agronex-deep text-white px-4 rounded-xl font-bold flex items-center justify-center transition-colors"
+              >
+                <Search size={18} />
               </button>
-              <button type="button" onClick={() => setSearchMode(false)} className="bg-gray-100 text-gray-600 px-3 rounded-xl font-bold">
-                Cancel
+              <button 
+                type="button" 
+                onClick={() => setSearchMode(false)} 
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 rounded-xl text-xs font-bold transition-colors"
+              >
+                {isTamil ? "ரத்து" : "Cancel"}
               </button>
             </form>
           )}
         </div>
 
         {weatherLoading ? (
-          <div className="text-center py-10 opacity-60">
-            <div className="w-8 h-8 border-4 border-green-200 border-t-green-600 rounded-full animate-spin mx-auto mb-3"></div>
-            <p className="font-medium text-gray-500">Loading weather data...</p>
+          <div className="text-center py-12 bg-white rounded-3xl border border-gray-100 shadow-xs">
+            <div className="w-10 h-10 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto mb-3"></div>
+            <p className="font-semibold text-gray-600 text-sm">
+              {isTamil ? "நேரலை வானிலை தரவு பெறப்படுகிறது..." : "Fetching live agricultural weather radar..."}
+            </p>
           </div>
         ) : weather && weather.current ? (
-          <>
-            <div className="mb-2 text-right">
-              <span className="text-xs font-medium text-gray-400">
-                Last updated: {new Date(weather.last_updated).toLocaleString()}
-              </span>
-            </div>
+          <div className="space-y-6">
             {/* Current Weather Card */}
-            <div className="bg-gradient-to-br from-agronex-primary to-green-700 rounded-3xl p-6 text-white shadow-md mb-6 relative overflow-hidden">
-              <div className="relative z-10 flex justify-between items-end">
+            <div className="bg-gradient-to-br from-[#0B5D3B] via-[#0f7249] to-[#16A36A] rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden">
+              <div className="relative z-10 flex justify-between items-start">
                 <div>
-                  <p className="text-5xl font-black mb-2">{Math.round(weather.current.temperature)}°</p>
-                  <p className="text-lg font-bold opacity-90">{isTamil && weather.condition_ta ? weather.condition_ta : weather.condition_en}</p>
+                  <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/15 text-emerald-100 inline-block mb-3 border border-white/20">
+                    Live Farm Atmosphere
+                  </span>
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-5xl sm:text-6xl font-black font-display tracking-tight">
+                      {Math.round(weather.current.temperature)}°
+                    </p>
+                    <span className="text-xl font-semibold opacity-70">C</span>
+                  </div>
+                  <p className="text-xl font-bold mt-1 text-emerald-100 font-display">
+                    {isTamil && weather.condition_ta ? weather.condition_ta : weather.condition_en}
+                  </p>
                 </div>
+
                 <div className="text-right">
-                  <CloudSun size={48} className="mb-2 inline-block opacity-80" />
-                  <p className="font-medium opacity-80 text-sm">Feels like {Math.round(weather.current.temperature + 2)}°</p>
+                  <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white ml-auto mb-2 border border-white/20">
+                    <CloudSun size={32} />
+                  </div>
+                  <p className="text-xs font-medium text-emerald-100">
+                    Feels like {Math.round(weather.current.temperature + 2)}°C
+                  </p>
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4 mt-6 pt-4 border-t border-white/20 relative z-10">
-                <div className="flex items-center gap-2">
-                  <Droplets size={18} className="opacity-70" />
-                  <span className="font-medium">{weather.current.humidity}% Humidity</span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-5 border-t border-white/15 relative z-10 text-xs">
+                <div className="bg-black/15 backdrop-blur-xs p-2.5 rounded-xl border border-white/10">
+                  <span className="opacity-70 text-[10px] uppercase font-bold block mb-0.5">Humidity</span>
+                  <div className="flex items-center gap-1.5 font-bold text-sm">
+                    <Droplets size={14} className="text-blue-300" />
+                    <span>{weather.current.humidity}%</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Wind size={18} className="opacity-70" />
-                  <span className="font-medium">{weather.current.wind_speed} km/h Wind</span>
+
+                <div className="bg-black/15 backdrop-blur-xs p-2.5 rounded-xl border border-white/10">
+                  <span className="opacity-70 text-[10px] uppercase font-bold block mb-0.5">Wind Speed</span>
+                  <div className="flex items-center gap-1.5 font-bold text-sm">
+                    <Wind size={14} className="text-teal-300" />
+                    <span>{weather.current.wind_speed} km/h</span>
+                  </div>
+                </div>
+
+                <div className="bg-black/15 backdrop-blur-xs p-2.5 rounded-xl border border-white/10">
+                  <span className="opacity-70 text-[10px] uppercase font-bold block mb-0.5">Spray Status</span>
+                  <div className="flex items-center gap-1.5 font-bold text-sm">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span>{weather.current.wind_speed < 15 ? "Suitable" : "Careful"}</span>
+                  </div>
+                </div>
+
+                <div className="bg-black/15 backdrop-blur-xs p-2.5 rounded-xl border border-white/10">
+                  <span className="opacity-70 text-[10px] uppercase font-bold block mb-0.5">Updated</span>
+                  <div className="font-semibold text-[11px] text-emerald-100 truncate">
+                    {new Date(weather.last_updated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
                 </div>
               </div>
               
-              <CloudSun size={180} className="absolute -bottom-10 -right-10 opacity-10 pointer-events-none" />
+              <CloudSun size={200} className="absolute -bottom-16 -right-16 opacity-10 pointer-events-none text-white" />
             </div>
 
             {/* Today Hourly Forecast */}
             {weather.hourly && weather.hourly.length > 0 && (
-              <>
-                <h3 className="font-black text-lg text-agronex-deep mb-3">
-                  {isTamil ? "இன்று" : "Today"}
+              <div>
+                <h3 className="font-extrabold text-base text-agronex-deep mb-3 font-display">
+                  {isTamil ? "இன்றைய மணிநேர முன்னறிவிப்பு" : "Hourly Rain & Temperature Radar"}
                 </h3>
-                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
-                  {/* Select next 4 points spacing them out */}
-                  {[weather.hourly[0], weather.hourly[4], weather.hourly[8], weather.hourly[12]].filter(Boolean).map((hourData, idx) => {
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-xs overflow-hidden divide-y divide-gray-100">
+                  {[weather.hourly[0], weather.hourly[3], weather.hourly[6], weather.hourly[9], weather.hourly[12]].filter(Boolean).map((hourData, idx) => {
                     const timeObj = new Date(hourData.time);
                     const timeStr = timeObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     return (
-                      <div key={idx} className="flex items-center justify-between p-4 border-b border-gray-50 last:border-0">
-                        <span className="w-20 font-bold text-gray-700">{timeStr}</span>
-                        <div className="flex-grow flex items-center justify-center gap-2 text-blue-500 font-medium text-sm">
-                          <CloudRain size={16} />
-                          {hourData.precipitation_probability}% {isTamil ? "மழை" : "rain"}
+                      <div key={idx} className="flex items-center justify-between p-3.5 px-5 hover:bg-gray-50/60 transition-colors">
+                        <span className="w-20 font-bold text-xs text-gray-700">{timeStr}</span>
+                        <div className="flex items-center gap-1.5 text-blue-600 font-semibold text-xs">
+                          <CloudRain size={15} />
+                          <span>{hourData.precipitation_probability}% {isTamil ? "மழை" : "Rain"}</span>
                         </div>
-                        <div className="w-16 text-right font-bold text-gray-800">
+                        <div className="w-16 text-right font-extrabold text-sm text-agronex-deep">
                           {Math.round(hourData.temperature)}°C
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              </>
+              </div>
             )}
 
             {/* Agricultural Weather Alerts */}
-            <h3 className="font-black text-lg text-agronex-deep mb-3 flex items-center gap-2">
-              <AlertTriangle size={20} className="text-orange-500" />
-              {isTamil ? "வேளாண் எச்சரிக்கைகள்" : "Agricultural Alerts"}
-            </h3>
-            
-            <div className="space-y-3 mb-8">
-              {weather.alerts && weather.alerts.length > 0 ? (
-                weather.alerts.map((alert, idx) => (
-                  <div key={idx} className={`p-4 rounded-2xl border ${getAlertColors(alert.type)} flex items-start gap-4 shadow-sm`}>
-                    <div className="mt-1 opacity-80">{getAlertIcon(alert.type)}</div>
+            <div>
+              <h3 className="font-extrabold text-base text-agronex-deep mb-3 flex items-center gap-2 font-display">
+                <AlertTriangle size={18} className="text-amber-500" />
+                <span>{isTamil ? "வேளாண் வானிலை எச்சரிக்கைகள்" : "Farming Weather Advisories"}</span>
+              </h3>
+              
+              <div className="space-y-3">
+                {weather.alerts && weather.alerts.length > 0 ? (
+                  weather.alerts.map((alert, idx) => (
+                    <div key={idx} className={`p-4 rounded-2xl border ${getAlertColors(alert.type)} flex items-start gap-3.5 shadow-xs`}>
+                      <div className="mt-1 text-emerald-700">{getAlertIcon(alert.type)}</div>
+                      <div>
+                        <h4 className="font-bold text-sm mb-0.5">{isTamil ? alert.title_ta : alert.title_en}</h4>
+                        <p className="text-xs font-medium opacity-90 leading-relaxed mb-2">
+                          {isTamil ? alert.message_ta : alert.message_en}
+                        </p>
+                        {alert.probability && (
+                          <span className="inline-block bg-white/60 px-2 py-0.5 rounded-md text-[11px] font-bold">
+                            {alert.probability}% Probability
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="bg-emerald-50/70 p-4 rounded-2xl border border-emerald-100 flex items-center gap-3 shadow-xs">
+                    <div className="bg-emerald-100 p-2 rounded-xl text-emerald-700">
+                      <CloudSun size={20} />
+                    </div>
                     <div>
-                      <h4 className="font-bold text-lg mb-1">{isTamil ? alert.title_ta : alert.title_en}</h4>
-                      <p className="text-sm font-medium opacity-90 leading-relaxed mb-2">
-                        {isTamil ? alert.message_ta : alert.message_en}
+                      <h4 className="font-bold text-emerald-900 text-xs">
+                        {isTamil ? "தற்போது குறிப்பிடத்தக்க வானிலை எச்சரிக்கைகள் இல்லை." : "✓ Normal weather conditions for crops."}
+                      </h4>
+                      <p className="text-[11px] text-emerald-700 font-medium">
+                        {isTamil ? "பயிர்களுக்கு உகந்த வானிலை நிலவுகிறது." : "Forecast indicates favorable conditions for farming operations."}
                       </p>
-                      {alert.probability && (
-                        <span className="inline-block bg-white/40 px-2 py-1 rounded text-xs font-bold">
-                          {alert.probability}% Probability
-                        </span>
-                      )}
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="bg-green-50 p-4 rounded-2xl border border-green-100 flex items-center gap-3">
-                  <div className="bg-white p-2 rounded-full text-green-500">
-                    <CloudSun size={20} />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-green-800">
-                      {isTamil ? "தற்போது குறிப்பிடத்தக்க வானிலை எச்சரிக்கைகள் இல்லை." : "✓ No significant weather alerts currently."}
-                    </h4>
-                    <p className="text-sm text-green-600 font-medium">
-                      {isTamil ? "தற்போதைய வானிலை பெரிய அபாயங்களை காட்டவில்லை." : "Current weather conditions do not indicate any major weather risk."}
-                    </p>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* 7 Day Forecast */}
-            <h3 className="font-black text-lg text-agronex-deep mb-3">
-              {isTamil ? "அடுத்த 7 நாட்கள்" : "7-Day Forecast"}
-            </h3>
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
-              {weather.forecast?.map((day, idx) => {
-                const dateObj = new Date(day.date);
-                const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
-                return (
-                  <div key={idx} className="flex items-center justify-between p-4 border-b border-gray-50 last:border-0">
-                    <span className="w-16 font-bold text-gray-700">{idx === 0 ? 'Today' : dayName}</span>
-                    <div className="flex-grow flex items-center justify-center gap-2 text-blue-500 font-medium text-sm">
-                      <CloudRain size={16} />
-                      {day.precipitation_probability_mean}%
+            <div>
+              <h3 className="font-extrabold text-base text-agronex-deep mb-3 font-display">
+                {isTamil ? "அடுத்த 7 நாட்கள் முன்னறிவிப்பு" : "7-Day Regional Forecast"}
+              </h3>
+              <div className="bg-white rounded-3xl border border-gray-100 shadow-xs overflow-hidden divide-y divide-gray-100">
+                {weather.forecast?.map((day, idx) => {
+                  const dateObj = new Date(day.date);
+                  const dayName = idx === 0 ? (isTamil ? 'இன்று' : 'Today') : dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+                  return (
+                    <div key={idx} className="flex items-center justify-between p-3.5 px-5 hover:bg-gray-50/60 transition-colors">
+                      <span className="w-18 font-bold text-xs text-gray-700">{dayName}</span>
+                      <div className="flex items-center gap-1.5 text-blue-600 font-semibold text-xs">
+                        <CloudRain size={14} />
+                        <span>{day.precipitation_probability_mean}%</span>
+                      </div>
+                      <div className="w-24 text-right font-extrabold text-xs text-gray-800">
+                        {Math.round(day.temperature_max)}° <span className="text-gray-400 font-medium ml-1">{Math.round(day.temperature_min)}°</span>
+                      </div>
                     </div>
-                    <div className="w-24 text-right font-bold text-gray-800">
-                      {Math.round(day.temperature_max)}° <span className="opacity-40 text-sm font-medium">{Math.round(day.temperature_min)}°</span>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </>
+          </div>
         ) : weather && !weather.success ? (
           <div className="bg-red-50 p-6 rounded-3xl border border-red-100 text-center">
             <AlertTriangle className="text-red-400 mx-auto mb-3" size={32} />

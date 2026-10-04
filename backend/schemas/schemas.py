@@ -62,3 +62,10 @@ class ChatMessage(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
+    audio_base64: Optional[str] = None
+
+class VoiceChatResponse(BaseModel):
+    detected_language: str
+    transcription: str
+    reply: str
+    audio_base64: Optional[str] = None

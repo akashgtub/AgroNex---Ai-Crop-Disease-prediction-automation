@@ -1,82 +1,1154 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Send, Mic, Bot, User } from 'lucide-react';
+import { 
+  Send, 
+  Mic, 
+  Bot, 
+  User, 
+  Volume2, 
+  VolumeX, 
+  Play, 
+  Pause, 
+  Paperclip, 
+  Trash2, 
+  AlertCircle, 
+  Sparkles, 
+  Loader2, 
+  Camera, 
+  RefreshCw, 
+  X, 
+  CheckCircle, 
+  AlertTriangle,
+  Image as ImageIcon
+} from 'lucide-react';
 
 export default function Assistant() {
   const { t, i18n } = useTranslation();
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
   const [messages, setMessages] = useState([
-    { id: 1, type: 'ai', text: i18n.language === 'en' ? "Hello! I'm AgroNex AI. How can I help you with your farm today?" : "வணக்கம்! நான் அக்ரோநெக்ஸ் AI. இன்று உங்கள் பண்ணைக்கு நான் எப்படி உதவ முடியும்?" }
+    { 
+      id: 1, 
+      type: 'ai', 
+      text: i18n.language === 'en' 
+        ? "Hello! I'm AgroNex AI. You can speak to me using the mic, take a live photo of your crop leaf with the camera, or type your farming questions below." 
+        : "வணக்கம்! நான் அக்ரோநெக்ஸ் AI. நீங்கள் மைக்ரோஃபோன் மூலம் பேசலாம், கேமரா மூலம் பயிர் இலையை படம் பிடிக்கலாம் அல்லது கீழே தட்டச்சு செய்யலாம்." 
+    }
   ]);
   const [input, setInput] = useState('');
-  
-  const sendMessage = (e) => {
-    e.preventDefault();
-    if (!input.trim()) return;
-    
-    // Add user message
-    const newMessages = [...messages, { id: Date.now(), type: 'user', text: input }];
-    setMessages(newMessages);
-    setInput('');
-    
-    // Simulate AI response
-    setTimeout(() => {
-      setMessages([...newMessages, { 
-        id: Date.now() + 1, 
-        type: 'ai', 
-        text: i18n.language === 'en' ? "This is a mock response from the AI backend. Your message was: " + input : "இது AI இலிருந்து வரும் மாதிரிப் பதில். உங்கள் செய்தி: " + input 
-      }]);
-    }, 1000);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
+
+  // Audio Recording State
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [recordedAudio, setRecordedAudio] = useState(null); // { file, url, name, duration }
+  const [waveBars, setWaveBars] = useState(() => Array(32).fill(6));
+
+  // Photo / Camera State
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState('environment'); // 'environment' | 'user'
+  const [capturedPhoto, setCapturedPhoto] = useState(null); // { file, url, name }
+  const [cameraActive, setCameraActive] = useState(false);
+
+  // Audio Playback State
+  const [activeAudioId, setActiveAudioId] = useState(null);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [previewPlaying, setPreviewPlaying] = useState(false);
+
+  // References
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const timerIntervalRef = useRef(null);
+  const streamRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const animFrameRef = useRef(null);
+  const audioPlayerRef = useRef(null);
+  const previewAudioRef = useRef(null);
+  const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const nativeCameraInputRef = useRef(null);
+  const videoRef = useRef(null);
+  const cameraStreamRef = useRef(null);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isLoading, isRecording, isPaused, capturedPhoto]);
+
+  // Clean up recording, camera & audio on unmount
+  useEffect(() => {
+    return () => {
+      cleanupAudioRecording();
+      closeLiveCamera();
+      if (audioPlayerRef.current) audioPlayerRef.current.pause();
+      if (previewAudioRef.current) previewAudioRef.current.pause();
+    };
+  }, []);
+
+  const cleanupAudioRecording = () => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+      audioCtxRef.current.close().catch(() => {});
+      audioCtxRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
   };
 
+  const formatTimer = (totalSeconds) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  // ----------------------------------------------------
+  // Live Camera Functionality
+  // ----------------------------------------------------
+  const openLiveCamera = async (facing = cameraFacing) => {
+    setErrorMsg(null);
+    setIsCameraOpen(true);
+    setCameraActive(false);
+
+    try {
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach(t => t.stop());
+        cameraStreamRef.current = null;
+      }
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        // Fallback to native capture input if WebRTC camera is unavailable
+        setIsCameraOpen(false);
+        nativeCameraInputRef.current?.click();
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: facing },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
+
+      cameraStreamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current.play().then(() => setCameraActive(true)).catch(() => setCameraActive(true));
+        };
+      } else {
+        setCameraActive(true);
+      }
+    } catch (err) {
+      console.warn("Live camera stream error, falling back to native camera:", err);
+      closeLiveCamera();
+      nativeCameraInputRef.current?.click();
+    }
+  };
+
+  const closeLiveCamera = () => {
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach(t => t.stop());
+      cameraStreamRef.current = null;
+    }
+    setIsCameraOpen(false);
+    setCameraActive(false);
+  };
+
+  const switchCameraFacing = () => {
+    const nextFacing = cameraFacing === 'environment' ? 'user' : 'environment';
+    setCameraFacing(nextFacing);
+    openLiveCamera(nextFacing);
+  };
+
+  const snapLivePhoto = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+
+    // If front camera, flip horizontally for mirror preview
+    if (cameraFacing === 'user') {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const file = new File([blob], `crop_leaf_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      const url = URL.createObjectURL(blob);
+      setCapturedPhoto({
+        file: file,
+        url: url,
+        name: file.name,
+      });
+      closeLiveCamera();
+    }, 'image/jpeg', 0.92);
+  };
+
+  // Fallback / Native Camera File Capture
+  const handleNativeCameraCapture = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+    setCapturedPhoto({
+      file: file,
+      url: url,
+      name: file.name,
+    });
+    e.target.value = '';
+  };
+
+  const removePhotoAttachment = () => {
+    if (capturedPhoto?.url) {
+      URL.revokeObjectURL(capturedPhoto.url);
+    }
+    setCapturedPhoto(null);
+  };
+
+  // ----------------------------------------------------
+  // Live Microphone Recording & Waveform Visualizer
+  // ----------------------------------------------------
+  const startRecording = async () => {
+    setErrorMsg(null);
+    setRecordedAudio(null);
+    setIsPaused(false);
+
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setErrorMsg("Microphone is not supported in this browser. Please use Chrome/Edge or upload an audio file.");
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      let mimeType = 'audio/webm';
+      if (typeof MediaRecorder !== 'undefined') {
+        const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
+        for (const type of types) {
+          if (MediaRecorder.isTypeSupported(type)) {
+            mimeType = type;
+            break;
+          }
+        }
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        if (audioChunksRef.current.length > 0) {
+          const extension = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('ogg') ? 'ogg' : 'webm';
+          const blob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
+          const file = new File([blob], `voice_${Date.now()}.${extension}`, { type: blob.type });
+          const url = URL.createObjectURL(blob);
+
+          setRecordedAudio({
+            file: file,
+            blob: blob,
+            url: url,
+            name: file.name,
+            duration: formatTimer(recordingSeconds || 1),
+          });
+        }
+      };
+
+      // Real-time audio waveform visualizer via Web Audio API
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          const audioCtx = new AudioContextClass();
+          audioCtxRef.current = audioCtx;
+          const analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 64;
+          const source = audioCtx.createMediaStreamSource(stream);
+          source.connect(analyser);
+
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          const updateWave = () => {
+            if (!analyser) return;
+            analyser.getByteFrequencyData(dataArray);
+            const bars = [];
+            const barCount = 32;
+            for (let i = 0; i < barCount; i++) {
+              const val = dataArray[i % dataArray.length] || 0;
+              const barH = Math.max(4, Math.min(24, Math.round((val / 255) * 24)));
+              bars.push(barH);
+            }
+            setWaveBars(bars);
+            animFrameRef.current = requestAnimationFrame(updateWave);
+          };
+          animFrameRef.current = requestAnimationFrame(updateWave);
+        }
+      } catch (audioErr) {
+        console.warn("Waveform visualizer init failed:", audioErr);
+      }
+
+      mediaRecorder.start(200);
+      setIsRecording(true);
+      setRecordingSeconds(0);
+
+      timerIntervalRef.current = setInterval(() => {
+        setRecordingSeconds(prev => prev + 1);
+      }, 1000);
+
+    } catch (err) {
+      console.error("Microphone access error:", err);
+      cleanupAudioRecording();
+      setIsRecording(false);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setErrorMsg(t('mic_permission_denied'));
+      } else {
+        setErrorMsg("Unable to access microphone: " + err.message);
+      }
+    }
+  };
+
+  const pauseRecording = () => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setIsRecording(false);
+    setIsPaused(true);
+  };
+
+  const discardRecording = () => {
+    cleanupAudioRecording();
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+    }
+    if (recordedAudio?.url) {
+      URL.revokeObjectURL(recordedAudio.url);
+    }
+    audioChunksRef.current = [];
+    setIsRecording(false);
+    setIsPaused(false);
+    setRecordedAudio(null);
+    setRecordingSeconds(0);
+    setPreviewPlaying(false);
+  };
+
+  const togglePreviewPlayback = () => {
+    if (!recordedAudio?.url) return;
+
+    if (!previewAudioRef.current) {
+      previewAudioRef.current = new Audio(recordedAudio.url);
+      previewAudioRef.current.onended = () => setPreviewPlaying(false);
+    }
+
+    if (previewPlaying) {
+      previewAudioRef.current.pause();
+      setPreviewPlaying(false);
+    } else {
+      previewAudioRef.current.play().then(() => {
+        setPreviewPlaying(true);
+      }).catch(err => {
+        console.warn("Preview play error:", err);
+        setPreviewPlaying(false);
+      });
+    }
+  };
+
+  // Local File Upload Handler (audio attachment)
+  const handleLocalFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('audio/') && !file.name.match(/\.(wav|mp3|m4a|webm|ogg|aac|flac)$/i)) {
+      setErrorMsg("Please select a valid audio file (.wav, .mp3, .m4a, .webm, .ogg)");
+      return;
+    }
+
+    setErrorMsg(null);
+    const url = URL.createObjectURL(file);
+    setRecordedAudio({
+      file: file,
+      blob: file,
+      url: url,
+      name: file.name,
+      duration: 'Local File',
+    });
+    setIsPaused(true);
+    e.target.value = '';
+  };
+
+  // Audio Playback for Chat Messages
+  const playAudio = (id, audioSrc) => {
+    if (activeAudioId === id && isPlayingAudio) {
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+      }
+      setIsPlayingAudio(false);
+      return;
+    }
+
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+    }
+
+    const audio = new Audio(audioSrc);
+    audioPlayerRef.current = audio;
+    setActiveAudioId(id);
+    setIsPlayingAudio(true);
+
+    audio.onended = () => {
+      setIsPlayingAudio(false);
+      setActiveAudioId(null);
+    };
+
+    audio.onerror = (e) => {
+      console.error("Audio playback error:", e);
+      setIsPlayingAudio(false);
+      setActiveAudioId(null);
+    };
+
+    audio.play().catch(err => {
+      console.warn("Audio play blocked:", err);
+      setIsPlayingAudio(false);
+    });
+  };
+
+  // ----------------------------------------------------
+  // Send Message (Text, Voice, or Live Camera Photo)
+  // ----------------------------------------------------
+  const handleSendVoice = async () => {
+    if (isRecording) {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        const stopPromise = new Promise((resolve) => {
+          mediaRecorderRef.current.onstop = () => {
+            const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            const file = new File([blob], `voice_${Date.now()}.webm`, { type: 'audio/webm' });
+            const url = URL.createObjectURL(blob);
+            resolve({ file, blob, url, name: file.name, duration: formatTimer(recordingSeconds || 1) });
+          };
+          mediaRecorderRef.current.stop();
+        });
+
+        const finalized = await stopPromise;
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current = null;
+        }
+        setIsRecording(false);
+        setIsPaused(false);
+        await processVoiceSubmission(finalized);
+        return;
+      }
+    }
+
+    if (recordedAudio) {
+      const audioToSend = recordedAudio;
+      setIsPaused(false);
+      setRecordedAudio(null);
+      await processVoiceSubmission(audioToSend);
+    }
+  };
+
+  const processVoiceSubmission = async (audioObj) => {
+    setErrorMsg(null);
+    const userMessageId = Date.now();
+    const newUserMessage = {
+      id: userMessageId,
+      type: 'user',
+      text: input.trim() || (i18n.language === 'ta' ? '🎤 குரல் பதிவு' : '🎤 Voice Message'),
+      isVoice: true,
+      audioUrl: audioObj.url,
+      fileName: audioObj.name,
+      imageUrl: capturedPhoto?.url,
+    };
+
+    setMessages(prev => [...prev, newUserMessage]);
+    setInput('');
+    const photoToSend = capturedPhoto;
+    setCapturedPhoto(null);
+    setIsLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', audioObj.file, audioObj.name || 'voice.webm');
+      formData.append('language', i18n.language || 'ta');
+
+      const res = await fetch(`${apiUrl}/api/assistant/voice`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error(`Voice server error (${res.status}): ${res.statusText}`);
+      }
+
+      const data = await res.json();
+
+      if (data.transcription) {
+        setMessages(prev => prev.map(msg => 
+          msg.id === userMessageId 
+            ? { ...msg, transcription: data.transcription }
+            : msg
+        ));
+      }
+
+      // If photo was also attached, run crop disease analysis
+      let cropResult = null;
+      if (photoToSend) {
+        try {
+          const cropForm = new FormData();
+          cropForm.append('file', photoToSend.file);
+          const cropRes = await fetch(`${apiUrl}/api/crops/analyze`, {
+            method: 'POST',
+            body: cropForm,
+          });
+          if (cropRes.ok) {
+            cropResult = await cropRes.json();
+          }
+        } catch (cropErr) {
+          console.warn("Crop analysis failed:", cropErr);
+        }
+      }
+
+      const aiMessageId = Date.now() + 1;
+      const newAiMessage = {
+        id: aiMessageId,
+        type: 'ai',
+        text: data.reply,
+        detectedLanguage: data.detected_language,
+        audioBase64: data.audio_base64,
+        cropAnalysis: cropResult,
+      };
+
+      setMessages(prev => [...prev, newAiMessage]);
+
+      if (data.audio_base64) {
+        const audioUrl = `data:audio/wav;base64,${data.audio_base64}`;
+        playAudio(aiMessageId, audioUrl);
+      }
+
+    } catch (err) {
+      console.error("API error:", err);
+      setErrorMsg("Failed to reach AgroNex voice assistant. Please check backend connection.");
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now() + 2,
+          type: 'ai',
+          text: i18n.language === 'ta'
+            ? "மன்னிக்கவும், குரலை செயலாக்குவதில் சிக்கல் ஏற்பட்டது. மீண்டும் முயற்சிக்கவும்."
+            : "Sorry, there was an issue processing your voice audio. Please try again.",
+          isError: true,
+        }
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSendText = async (e) => {
+    if (e) e.preventDefault();
+    const trimmedInput = input.trim();
+    if (!trimmedInput && !capturedPhoto) return;
+
+    setErrorMsg(null);
+    const userMessageId = Date.now();
+    const photoToSend = capturedPhoto;
+
+    const newUserMessage = {
+      id: userMessageId,
+      type: 'user',
+      text: trimmedInput || (i18n.language === 'ta' ? '📷 பயிர் புகைப்படம் பகுப்பாய்வு' : '📷 Crop Photo Analysis'),
+      imageUrl: photoToSend?.url,
+    };
+
+    setMessages(prev => [...prev, newUserMessage]);
+    setInput('');
+    setCapturedPhoto(null);
+    setIsLoading(true);
+
+    try {
+      let cropResult = null;
+      let diagnosisSummary = "";
+
+      // 1. If photo is attached, analyze crop leaf disease
+      if (photoToSend) {
+        const cropForm = new FormData();
+        cropForm.append('file', photoToSend.file);
+
+        const cropRes = await fetch(`${apiUrl}/api/crops/analyze`, {
+          method: 'POST',
+          body: cropForm,
+        });
+
+        if (cropRes.ok) {
+          cropResult = await cropRes.json();
+          const condName = (cropResult.condition || '').replace(/_/g, ' ');
+          const conf = (cropResult.confidence * 100).toFixed(0);
+          diagnosisSummary = ` Crop Analysis: ${condName} (${conf}% confidence). Status: ${cropResult.status}. Severity: ${cropResult.severity}.`;
+        }
+      }
+
+      // 2. Chat query with assistant
+      const promptToSend = trimmedInput 
+        ? `${trimmedInput}${diagnosisSummary ? ` [Image Observation: ${diagnosisSummary}]` : ''}`
+        : `Farmer uploaded a crop leaf photo.${diagnosisSummary ? ` Analysis detected: ${diagnosisSummary}.` : ''} Please provide concise diagnosis and treatment guidance.`;
+
+      const res = await fetch(`${apiUrl}/api/assistant/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: promptToSend,
+          language: i18n.language || 'en',
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Chat error (${res.status}): ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      const aiMessageId = Date.now() + 1;
+      const newAiMessage = {
+        id: aiMessageId,
+        type: 'ai',
+        text: data.reply,
+        audioBase64: data.audio_base64,
+        cropAnalysis: cropResult,
+      };
+
+      setMessages(prev => [...prev, newAiMessage]);
+
+      if (data.audio_base64) {
+        const audioUrl = `data:audio/wav;base64,${data.audio_base64}`;
+        playAudio(aiMessageId, audioUrl);
+      }
+    } catch (err) {
+      console.error("API error:", err);
+      setErrorMsg("Failed to reach AgroNex assistant.");
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now() + 2,
+          type: 'ai',
+          text: i18n.language === 'ta'
+            ? "மன்னிக்கவும், சேவையகத்துடன் தொடர்புகொள்வதில் சிக்கல் ஏற்பட்டது."
+            : "Sorry, could not connect to AgroNex assistant. Please ensure backend is running.",
+          isError: true,
+        }
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const sendQuickPrompt = (promptText) => {
+    setInput(promptText);
+  };
+
+  const quickPrompts = i18n.language === 'ta' 
+    ? [
+        "தக்காளி இலையில் மஞ்சள் புள்ளி உள்ளது, என்ன உரம் இடலாம்?",
+        "நெற்பயிருக்கு யூரியா எப்போது இட வேண்டும்?",
+        "இன்றைய வானிலை அடிப்படையில் பூச்சி மருந்து தெளிக்கலாமா?"
+      ]
+    : [
+        "Yellow spots on tomato leaves, what fertilizer to use?",
+        "When is the best time to apply fertilizer for paddy?",
+        "Is today's weather suitable for pesticide spray?"
+      ];
+
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-100px)] bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="bg-agronex-deep text-white p-4 flex items-center gap-3">
-        <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-          <Bot size={24} />
+    <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-100px)] bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden relative">
+      {/* Header */}
+      <div className="bg-agronex-deep text-white p-4 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+            <Bot size={24} />
+          </div>
+          <div>
+            <h2 className="font-bold text-lg leading-tight flex items-center gap-2">
+              {t('ask_ai_title')}
+              <span className="text-xs bg-green-500/30 text-green-200 border border-green-400/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <Sparkles size={10} /> Sarvam AI Voice & Vision
+              </span>
+            </h2>
+            <p className="text-green-100 text-xs">{t('ask_ai_subtitle')}</p>
+          </div>
         </div>
-        <div>
-          <h2 className="font-bold text-lg leading-tight">{t('ask_ai_title')}</h2>
-          <p className="text-green-100 text-xs">{t('ask_ai_subtitle')}</p>
+
+        <div className="text-xs text-green-200 font-medium bg-black/20 px-3 py-1.5 rounded-full border border-white/10">
+          {i18n.language === 'ta' ? 'தமிழ் / English' : 'English / தமிழ்'}
         </div>
       </div>
-      
+
+      {/* Error banner */}
+      {errorMsg && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-800 flex items-center justify-between animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={14} className="text-amber-600 flex-shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+          <button onClick={() => setErrorMsg(null)} className="text-amber-700 hover:text-amber-900 font-bold ml-2">×</button>
+        </div>
+      )}
+
+      {/* Messages area */}
       <div className="flex-grow p-4 overflow-y-auto space-y-4 bg-gray-50/50">
         {messages.map(msg => (
           <div key={msg.id} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'} gap-2`}>
             {msg.type === 'ai' && (
-               <div className="w-8 h-8 bg-agronex-primary rounded-full flex items-center justify-center text-white flex-shrink-0 mt-1">
-                 <Bot size={16} />
-               </div>
+              <div className="w-8 h-8 bg-agronex-primary rounded-full flex items-center justify-center text-white flex-shrink-0 mt-1 shadow-sm">
+                <Bot size={16} />
+              </div>
             )}
-            <div className={`max-w-[75%] p-3 rounded-2xl text-sm ${msg.type === 'user' ? 'bg-agronex-primary text-white rounded-tr-sm' : 'bg-white border border-gray-100 text-gray-800 shadow-sm rounded-tl-sm'}`}>
-              {msg.text}
+
+            <div className={`max-w-[85%] md:max-w-[75%] p-3.5 rounded-2xl text-sm leading-relaxed shadow-sm ${
+              msg.type === 'user' 
+                ? 'bg-agronex-primary text-white rounded-tr-sm' 
+                : msg.isError 
+                  ? 'bg-red-50 border border-red-200 text-red-700 rounded-tl-sm'
+                  : 'bg-white border border-gray-100 text-gray-800 rounded-tl-sm'
+            }`}>
+              {/* If user sent an image */}
+              {msg.imageUrl && (
+                <div className="mb-2.5 rounded-xl overflow-hidden border border-white/20 shadow-sm max-h-60 bg-black/5">
+                  <img src={msg.imageUrl} alt="Crop Leaf" className="w-full h-auto object-cover max-h-56 rounded-xl" />
+                </div>
+              )}
+
+              {/* User Voice Audio Player */}
+              {msg.isVoice && msg.audioUrl && (
+                <div className="mb-2 p-2 bg-white/15 rounded-xl border border-white/20 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => playAudio(`user-${msg.id}`, msg.audioUrl)}
+                      className="w-8 h-8 rounded-full bg-white text-agronex-deep flex items-center justify-center hover:scale-105 transition-transform shadow-xs"
+                      title="Play recorded voice"
+                    >
+                      {activeAudioId === `user-${msg.id}` && isPlayingAudio ? (
+                        <Pause size={14} />
+                      ) : (
+                        <Play size={14} className="ml-0.5" />
+                      )}
+                    </button>
+                    <div className="text-xs">
+                      <div className="font-semibold">{t('voice_message')}</div>
+                      <div className="opacity-80 text-[11px]">{msg.fileName || 'voice.webm'}</div>
+                    </div>
+                  </div>
+                  <Mic size={16} className="opacity-70" />
+                </div>
+              )}
+
+              {/* Show transcription if available */}
+              {msg.transcription && (
+                <div className="mb-1.5 text-xs bg-white/20 px-2.5 py-1.5 rounded-lg text-green-50 italic">
+                  <span className="font-semibold not-italic">🗣️ {t('transcribed')}: </span>
+                  "{msg.transcription}"
+                </div>
+              )}
+
+              {/* Crop Analysis Badge if returned by AI */}
+              {msg.cropAnalysis && (
+                <div className="mb-2 p-3 bg-green-50 border border-green-200 rounded-xl text-gray-800 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-agronex-deep flex items-center gap-1.5 text-xs">
+                      {msg.cropAnalysis.is_healthy ? (
+                        <CheckCircle size={15} className="text-green-600" />
+                      ) : (
+                        <AlertTriangle size={15} className="text-amber-600" />
+                      )}
+                      {(msg.cropAnalysis.condition || '').replace(/_/g, ' ')}
+                    </span>
+                    <span className="text-[11px] font-semibold bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                      {(msg.cropAnalysis.confidence * 100).toFixed(0)}% Match
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] text-gray-600 flex items-center gap-3">
+                    <span><strong>Status:</strong> {msg.cropAnalysis.status}</span>
+                    <span>•</span>
+                    <span><strong>Severity:</strong> {msg.cropAnalysis.severity || 'Moderate'}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Message text */}
+              <div className="whitespace-pre-wrap">{msg.text}</div>
+
+              {/* AI Voice playback button */}
+              {msg.type === 'ai' && msg.audioBase64 && (
+                <div className="mt-2.5 pt-2 border-t border-gray-100 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => playAudio(`ai-${msg.id}`, `data:audio/wav;base64,${msg.audioBase64}`)}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-agronex-primary/10 text-agronex-primary hover:bg-agronex-primary hover:text-white transition-all shadow-xs"
+                  >
+                    {activeAudioId === `ai-${msg.id}` && isPlayingAudio ? (
+                      <>
+                        <VolumeX size={14} />
+                        <span>{t('pause') || 'Pause'}</span>
+                        <span className="flex gap-0.5 items-end h-3 ml-1">
+                          <span className="w-1 bg-current rounded-full animate-bounce h-2"></span>
+                          <span className="w-1 bg-current rounded-full animate-bounce h-3 delay-100"></span>
+                          <span className="w-1 bg-current rounded-full animate-bounce h-1.5 delay-200"></span>
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 size={14} />
+                        <span>{t('listen_voice')}</span>
+                      </>
+                    )}
+                  </button>
+                  {msg.detectedLanguage && (
+                    <span className="text-[10px] text-gray-400 font-mono">
+                      {msg.detectedLanguage}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
+
             {msg.type === 'user' && (
-               <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 flex-shrink-0 mt-1">
-                 <User size={16} />
-               </div>
+              <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 flex-shrink-0 mt-1">
+                <User size={16} />
+              </div>
             )}
           </div>
         ))}
+
+        {/* Loading state */}
+        {isLoading && (
+          <div className="flex justify-start gap-2 items-center">
+            <div className="w-8 h-8 bg-agronex-primary rounded-full flex items-center justify-center text-white flex-shrink-0 animate-pulse">
+              <Bot size={16} />
+            </div>
+            <div className="bg-white border border-gray-100 p-3 rounded-2xl rounded-tl-sm text-xs text-gray-500 shadow-sm flex items-center gap-2">
+              <Loader2 size={16} className="animate-spin text-agronex-primary" />
+              <span>{t('listening_ai')}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Quick prompt suggestions when only welcome message */}
+        {messages.length === 1 && !isRecording && !isPaused && (
+          <div className="pt-2">
+            <p className="text-xs text-gray-400 mb-2 font-medium">💡 Try asking, speaking, or snapping a crop photo:</p>
+            <div className="flex flex-wrap gap-2">
+              {quickPrompts.map((prompt, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => sendQuickPrompt(prompt)}
+                  className="text-xs text-gray-600 bg-white border border-gray-200 hover:border-agronex-primary hover:text-agronex-primary px-3 py-1.5 rounded-full transition-colors text-left"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
       </div>
-      
+
+      {/* Live Camera Viewfinder Overlay Modal */}
+      {isCameraOpen && (
+        <div className="absolute inset-0 z-50 bg-black/95 flex flex-col justify-between p-4 animate-fadeIn">
+          {/* Top Bar: Close & Switch Camera */}
+          <div className="flex items-center justify-between text-white z-10">
+            <button
+              type="button"
+              onClick={closeLiveCamera}
+              className="p-2.5 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+              title="Close camera"
+            >
+              <X size={20} />
+            </button>
+            <span className="text-xs font-semibold bg-white/20 px-3 py-1 rounded-full">
+              {i18n.language === 'ta' ? 'பயிர் இலையை மையத்தில் வைக்கவும்' : 'Focus leaf in camera frame'}
+            </span>
+            <button
+              type="button"
+              onClick={switchCameraFacing}
+              className="p-2.5 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+              title="Flip camera"
+            >
+              <RefreshCw size={20} />
+            </button>
+          </div>
+
+          {/* Camera Viewfinder Video Feed */}
+          <div className="flex-grow flex items-center justify-center relative overflow-hidden my-2 rounded-2xl border-2 border-white/30 bg-black">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+            />
+            {/* Viewfinder Target Guide Overlay */}
+            <div className="absolute inset-8 border-2 border-dashed border-white/50 rounded-2xl pointer-events-none flex items-center justify-center">
+              <span className="text-[11px] text-white/80 bg-black/40 px-3 py-1 rounded-full">
+                🌿 {t('take_photo')}
+              </span>
+            </div>
+          </div>
+
+          {/* Bottom Bar: Shutter Button */}
+          <div className="flex items-center justify-around py-3 z-10">
+            <button
+              type="button"
+              onClick={() => nativeCameraInputRef.current?.click()}
+              className="text-xs text-gray-300 hover:text-white flex flex-col items-center gap-1"
+            >
+              <ImageIcon size={22} />
+              <span>{t('upload_image')}</span>
+            </button>
+
+            {/* Big Shutter Button */}
+            <button
+              type="button"
+              onClick={snapLivePhoto}
+              className="w-18 h-18 rounded-full border-4 border-white bg-agronex-primary hover:scale-105 active:scale-95 flex items-center justify-center shadow-2xl transition-transform"
+              title="Snap Photo"
+            >
+              <div className="w-14 h-14 rounded-full bg-white/90"></div>
+            </button>
+
+            <button
+              type="button"
+              onClick={closeLiveCamera}
+              className="text-xs text-gray-300 hover:text-white flex flex-col items-center gap-1"
+            >
+              <X size={22} />
+              <span>{t('cancel_recording')}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Input container: Switches to WhatsApp-style Voice Bar when recording or paused */}
       <div className="p-3 bg-white border-t border-gray-100">
-        <form onSubmit={sendMessage} className="flex gap-2 bg-gray-100 p-1 pl-4 rounded-full items-center">
-          <input 
-            type="text" 
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={t('type_message')}
-            className="flex-grow bg-transparent border-none outline-none text-gray-700 text-sm"
-          />
-          <button type="button" className="p-2 text-gray-500 hover:text-agronex-primary transition-colors">
-            <Mic size={20} />
-          </button>
-          <button type="submit" className="p-2 bg-agronex-primary text-white rounded-full hover:bg-agronex-deep transition-colors">
-            <Send size={18} className="ml-1" />
-          </button>
-        </form>
+        {/* Attached Photo Preview (Saved until entered and sent) */}
+        {capturedPhoto && !isRecording && (
+          <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded-2xl flex items-center justify-between gap-3 animate-fadeIn">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="w-12 h-12 rounded-xl overflow-hidden bg-black/10 flex-shrink-0 border border-green-300">
+                <img src={capturedPhoto.url} alt="Crop Thumbnail" className="w-full h-full object-cover" />
+              </div>
+              <div className="overflow-hidden">
+                <div className="text-xs font-bold text-agronex-deep truncate">
+                  {capturedPhoto.name}
+                </div>
+                <div className="text-[11px] text-green-700 flex items-center gap-1 font-medium">
+                  <CheckCircle size={12} />
+                  <span>{i18n.language === 'ta' ? 'பயிர் புகைப்படம் இணைக்கப்பட்டது' : 'Crop leaf photo ready'}</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={removePhotoAttachment}
+              className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors flex-shrink-0"
+              title="Remove photo"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        )}
+
+        {isRecording || isPaused ? (
+          /* ======================================================== */
+          /* WhatsApp / Telegram Style Voice Recording Capsule Bar   */
+          /* [Trash]  [Red Dot] 0:04  |||||||||||||||||||  [Pause] [>] */
+          /* ======================================================== */
+          <div className="bg-[#18222d] text-white rounded-full p-2 px-4 flex items-center justify-between gap-3 shadow-md animate-fadeIn">
+            {/* 1. Trash Can Icon (Left) */}
+            <button
+              type="button"
+              onClick={discardRecording}
+              className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-white/10 rounded-full transition-colors flex-shrink-0"
+              title="Delete recording"
+            >
+              <Trash2 size={20} />
+            </button>
+
+            {/* 2. Red Pulsing Dot + Live Timer */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className={`w-2.5 h-2.5 rounded-full ${isPaused ? 'bg-amber-400' : 'bg-[#f87171] animate-ping'}`} />
+              <span className="font-mono text-sm font-semibold text-white tracking-wide">
+                {formatTimer(recordingSeconds)}
+              </span>
+            </div>
+
+            {/* 3. Audio Waveform Visualizer (Center) */}
+            <div className="flex-grow flex items-center justify-center gap-[2.5px] h-7 px-2 overflow-hidden">
+              {waveBars.map((height, i) => (
+                <span
+                  key={i}
+                  style={{ height: `${height}px` }}
+                  className={`w-[2.5px] rounded-full transition-all duration-75 ${
+                    isPaused ? 'bg-gray-500' : 'bg-gray-300'
+                  }`}
+                />
+              ))}
+            </div>
+
+            {/* 4. Pause / Stop / Play Preview Toggle */}
+            {isRecording ? (
+              <button
+                type="button"
+                onClick={pauseRecording}
+                className="p-1.5 flex items-center justify-center gap-1 hover:opacity-80 transition-opacity flex-shrink-0"
+                title="Pause & review recording"
+              >
+                <span className="w-1.5 h-5 bg-[#f87171] rounded-full" />
+                <span className="w-1.5 h-5 bg-[#f87171] rounded-full" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={togglePreviewPlayback}
+                className="p-1.5 text-[#f87171] hover:opacity-80 transition-opacity flex-shrink-0"
+                title={previewPlaying ? "Pause preview" : "Listen to preview"}
+              >
+                {previewPlaying ? <Pause size={20} className="fill-[#f87171]" /> : <Play size={20} className="fill-[#f87171]" />}
+              </button>
+            )}
+
+            {/* 5. Green Circular Send Button (Right) */}
+            <button
+              type="button"
+              onClick={handleSendVoice}
+              disabled={isLoading}
+              className="w-10 h-10 rounded-full bg-[#00a884] hover:bg-[#008f6f] active:scale-95 text-black flex items-center justify-center shadow-lg transition-transform flex-shrink-0"
+              title="Send voice query"
+            >
+              <Send size={18} className="text-black ml-0.5" />
+            </button>
+          </div>
+        ) : (
+          /* ======================================================== */
+          /* Normal Message Input Form                                */
+          /* ======================================================== */
+          <form onSubmit={handleSendText} className="flex gap-2 bg-gray-100 p-1 pl-3 rounded-full items-center">
+            {/* Hidden file input for audio attachment */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleLocalFileUpload}
+              accept="audio/*,.wav,.mp3,.m4a,.webm,.ogg"
+              className="hidden"
+            />
+
+            {/* Hidden file input for native device camera fallback */}
+            <input
+              type="file"
+              ref={nativeCameraInputRef}
+              onChange={handleNativeCameraCapture}
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+            />
+
+            {/* 1. Attachment Button (Audio / File) */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2 text-gray-500 hover:text-agronex-primary transition-colors rounded-full hover:bg-white/80"
+              title={t('upload_audio')}
+            >
+              <Paperclip size={18} />
+            </button>
+
+            {/* 2. Live Camera Button (Take Photo) */}
+            <button
+              type="button"
+              onClick={() => openLiveCamera('environment')}
+              className="p-2 text-gray-500 hover:text-agronex-primary transition-colors rounded-full hover:bg-white/80"
+              title={t('take_photo')}
+            >
+              <Camera size={19} />
+            </button>
+
+            {/* 3. Text input */}
+            <input 
+              type="text" 
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={capturedPhoto ? (i18n.language === 'ta' ? "புகைப்படம் தயாராக உள்ளது. கேள்வி கேட்கவும்..." : "Photo ready. Ask a question or press Send...") : t('type_message')}
+              disabled={isLoading}
+              className="flex-grow bg-transparent border-none outline-none text-gray-700 text-sm placeholder-gray-400"
+            />
+
+            {/* 4. Live Mic button */}
+            <button 
+              type="button" 
+              onClick={startRecording}
+              disabled={isLoading}
+              className="p-2 text-gray-500 hover:text-red-600 transition-colors rounded-full hover:bg-white/80"
+              title={i18n.language === 'ta' ? "பேச மைக் கிளிக் செய்க" : "Click to speak via microphone"}
+            >
+              <Mic size={20} />
+            </button>
+
+            {/* 5. Submit / Send button */}
+            <button 
+              type="submit" 
+              disabled={isLoading || (!input.trim() && !capturedPhoto)}
+              className={`p-2 rounded-full transition-all shadow-xs ${
+                (!input.trim() && !capturedPhoto) || isLoading
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-agronex-primary text-white hover:bg-agronex-deep hover:scale-105'
+              }`}
+              title="Send message"
+            >
+              <Send size={18} className="ml-0.5" />
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );
 }
+
+
+

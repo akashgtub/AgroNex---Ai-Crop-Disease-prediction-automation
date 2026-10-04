@@ -58,46 +58,72 @@ export default function LocationWeatherCard() {
   const rainChance = today ? (today.precipitation_probability_mean || 0) : 0;
 
   return (
-    <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-3xl p-6 shadow-sm relative overflow-hidden">
+    <div className="relative rounded-3xl p-6 shadow-sm border border-emerald-100 bg-gradient-to-br from-emerald-50/90 via-teal-50/50 to-green-50/80 overflow-hidden">
       {/* Location Header */}
       <div className="flex justify-between items-start mb-4 relative z-10">
-        <div className="flex items-center gap-2 text-agronex-deep">
-          <MapPin size={20} className="text-green-600" />
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
+            <MapPin size={17} />
+          </div>
           <div>
-            <p className="text-xs font-bold text-green-700 uppercase tracking-wide">Current Location</p>
-            <h3 className="font-bold text-lg">{location?.city}, {location?.state}</h3>
+            <p className="text-[10px] font-extrabold text-emerald-800 uppercase tracking-wider">
+              {isTamil ? "தற்போதைய பண்ணை இருப்பிடம்" : "CURRENT FARM LOCATION"}
+            </p>
+            <h3 className="font-bold text-base text-agronex-deep">
+              {location?.city ? `${location.city}, ${location.state}` : (isTamil ? "இருப்பிடம் பெறப்படுகிறது..." : "Detecting location...")}
+            </h3>
           </div>
         </div>
-        <button onClick={requestLocation} className="text-green-700 bg-white/50 hover:bg-white/80 p-2 rounded-full transition-colors" title="Refresh Location">
-          <Navigation size={16} />
+        <button 
+          onClick={requestLocation} 
+          className="text-emerald-700 bg-white/80 hover:bg-white p-2 rounded-xl border border-emerald-200/50 shadow-xs hover:scale-105 active:scale-95 transition-all" 
+          title="Refresh Location"
+        >
+          <Navigation size={15} />
         </button>
       </div>
 
       {weatherLoading ? (
-        <div className="flex items-center gap-2 text-green-700 opacity-60">
-          <div className="w-4 h-4 border-2 border-green-700/30 border-t-green-700 rounded-full animate-spin"></div>
-          <span className="text-sm font-medium">Fetching live weather...</span>
+        <div className="flex items-center gap-2 text-emerald-800 py-4">
+          <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-sm font-semibold">{isTamil ? "நேரலை வானிலை பெறப்படுகிறது..." : "Fetching live weather..."}</span>
         </div>
       ) : current ? (
         <div className="relative z-10">
-          <div className="flex items-end gap-3 mb-4">
-            <span className="text-4xl font-bold text-agronex-deep">{Math.round(current.temperature)}°C</span>
-            <span className="text-lg font-medium text-green-800 mb-1">{isTamil && weather.condition_ta ? weather.condition_ta : weather.condition_en}</span>
+          <div className="flex items-baseline justify-between mb-4">
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl sm:text-5xl font-extrabold text-agronex-deep font-display tracking-tight">
+                {Math.round(current.temperature)}°
+              </span>
+              <span className="text-sm font-bold text-gray-400">C</span>
+            </div>
+            <div className="text-right">
+              <span className="text-base font-bold text-emerald-950 block">
+                {isTamil && weather.condition_ta ? weather.condition_ta : weather.condition_en}
+              </span>
+              <span className="text-xs text-emerald-700 font-medium">
+                {isTamil ? "இன்றைய நிலவரம்" : "Today's forecast"}
+              </span>
+            </div>
           </div>
           
-          <div className="flex items-center gap-4 text-sm font-semibold text-green-800 mb-5">
-            <div className="flex items-center gap-1">
-              <CloudRain size={16} className="text-blue-500" />
-              Rain chance: {rainChance}%
+          <div className="grid grid-cols-2 gap-2.5 mb-4">
+            <div className="flex items-center gap-2 bg-white/80 backdrop-blur-xs p-2.5 rounded-xl border border-emerald-100/60 text-xs font-semibold text-gray-700">
+              <CloudRain size={16} className="text-blue-500 flex-shrink-0" />
+              <span>{isTamil ? "மழை வாய்ப்பு" : "Rain"}: <strong className="text-blue-900">{rainChance}%</strong></span>
             </div>
-            <div className="flex items-center gap-1">
-              <Wind size={16} className="text-orange-500" />
-              {current.wind_speed} km/h
+            <div className="flex items-center gap-2 bg-white/80 backdrop-blur-xs p-2.5 rounded-xl border border-emerald-100/60 text-xs font-semibold text-gray-700">
+              <Wind size={16} className="text-teal-600 flex-shrink-0" />
+              <span>{isTamil ? "காற்று" : "Wind"}: <strong className="text-teal-900">{current.wind_speed} km/h</strong></span>
             </div>
           </div>
 
-          <Link to="/weather" className="block text-center bg-white text-agronex-deep font-bold py-3 rounded-xl shadow-sm hover:shadow transition-all border border-green-100">
-            {isTamil ? "வானிலை விவரங்களைக் காண்க" : "View Weather Details"}
+          <Link 
+            to="/weather" 
+            className="flex items-center justify-center gap-2 bg-white hover:bg-emerald-50/80 text-agronex-deep font-bold py-3 rounded-xl shadow-xs border border-emerald-200/80 hover:shadow transition-all text-xs"
+          >
+            <span>{isTamil ? "முழு வானிலை & மழை முன்னறிவிப்பு" : "View 7-Day Forecast & Alerts"}</span>
+            <CloudSun size={15} className="text-emerald-600" />
           </Link>
         </div>
       ) : (
@@ -111,8 +137,8 @@ export default function LocationWeatherCard() {
         </div>
       )}
 
-      {/* Decorative */}
-      <CloudSun size={120} className="absolute -bottom-6 -right-6 text-white opacity-40 pointer-events-none" />
+      {/* Decorative background sun icon */}
+      <CloudSun size={140} className="absolute -bottom-8 -right-6 text-emerald-600/10 pointer-events-none" />
     </div>
   );
 }
