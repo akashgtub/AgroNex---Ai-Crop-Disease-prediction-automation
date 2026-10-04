@@ -30,7 +30,8 @@ export default function CropCheck() {
     formData.append('file', fileObj);
     
     try {
-      const response = await fetch('http://localhost:8000/api/crops/analyze', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/api/crops/analyze`, {
         method: 'POST',
         body: formData,
       });

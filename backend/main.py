@@ -9,10 +9,16 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="AgroNex API", description="Smart Farming Backend", version="1.0.0")
 
+# Determine allowed origins based on environment variable
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+origins = [frontend_url]
+if os.getenv("ALLOW_ALL_ORIGINS") == "true":
+    origins = ["*"]
+
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -29,3 +35,7 @@ app.include_router(profile.router, prefix="/api/profile", tags=["Profile"])
 @app.get("/")
 def read_root():
     return {"message": "Welcome to AgroNex API"}
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}

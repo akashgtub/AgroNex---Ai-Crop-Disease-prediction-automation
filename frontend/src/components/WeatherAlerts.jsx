@@ -30,7 +30,8 @@ export default function WeatherAlerts({ crop, condition }) {
           const lat = position.coords.latitude;
           const lon = position.coords.longitude;
           
-          let url = `http://localhost:8000/api/weather/forecast?lat=${lat}&lon=${lon}`;
+          const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+          let url = `${apiUrl}/api/weather/forecast?lat=${lat}&lon=${lon}`;
           if (crop) url += `&crop=${encodeURIComponent(crop)}`;
           if (condition) url += `&condition=${encodeURIComponent(condition)}`;
           

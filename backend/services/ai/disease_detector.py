@@ -3,15 +3,16 @@ import numpy as np
 import onnxruntime as ort
 from PIL import Image
 import os
+from pathlib import Path
 
 class DiseaseDetector:
     def __init__(self):
         # Paths
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        model_dir = os.path.join(base_dir, 'models')
+        base_dir = Path(__file__).resolve().parent.parent.parent
+        model_dir = base_dir / 'models'
         
-        self.model_path = os.path.join(model_dir, 'efficientnet_v2_s_best.onnx')
-        self.classes_path = os.path.join(model_dir, 'classes.json')
+        self.model_path = str(model_dir / 'efficientnet_v2_s_best.onnx')
+        self.classes_path = str(model_dir / 'classes.json')
         
         # Load classes and normalisation config
         with open(self.classes_path, 'r') as f:
