@@ -16,6 +16,8 @@ detector = DiseaseDetector()
 @router.post("/analyze", response_model=schemas.CropAnalysisResponse)
 async def analyze_crop(
     file: UploadFile = File(...),
+    mode: str = Form("direct"),
+    enable_tta: bool = Form(False),
     db: Session = Depends(get_db)
 ):
     if not file.content_type.startswith('image/'):
@@ -23,7 +25,8 @@ async def analyze_crop(
         
     # Save the file temporarily
     os.makedirs("uploads", exist_ok=True)
-    file_path = f"uploads/{file.filename}"
+    filename = os.path.basename(file.filename)
+    file_path = f"uploads/{filename}"
     file_bytes = await file.read()
     
     with open(file_path, "wb") as buffer:
@@ -42,11 +45,12 @@ async def analyze_crop(
     print(f"\nContent type:\n{file.content_type}")
     print(f"\nSize:\n{file_size_kb:.1f} KB")
     print(f"\nDimensions:\n{img_width} x {img_height}")
+    print(f"\nMode:\n{mode}, TTA: {enable_tta}")
     print("=================================\n")
     
     # Use AI service
     try:
-        prediction = detector.predict(file_path)
+        prediction = detector.predict(file_path, preprocessing_mode=mode, enable_tta=enable_tta)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Crop analysis failed: {str(e)}")
     

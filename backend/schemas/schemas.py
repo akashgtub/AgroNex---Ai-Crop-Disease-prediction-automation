@@ -46,6 +46,15 @@ class CropAnalysisResponse(BaseModel):
     is_healthy: bool
     status: str
     top_predictions: List[TopPrediction]
+    disease: Optional[str] = None
+    severity: Optional[str] = "Not determined"
+    risk: Optional[str] = "Not determined"
+    quality_status: Optional[str] = "Passed"
+    warning_message: Optional[str] = None
+    uncertainty_reason: Optional[str] = None
+    latency_ms: Optional[float] = None
+    preprocessing_mode: Optional[str] = "direct"
+    tta_enabled: Optional[bool] = False
 
 class ChatMessage(BaseModel):
     message: str
