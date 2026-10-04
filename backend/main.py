@@ -1,12 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api import crops, assistant, profile, auth, weather, schemes
+<<<<<<< HEAD
 from api.google_auth import router as google_auth_router
 from config.database import Base, engine
+=======
+>>>>>>> origin/main
 import os
-
-# Create database tables
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="AgroNex API", description="Smart Farming Backend", version="1.0.0")
 

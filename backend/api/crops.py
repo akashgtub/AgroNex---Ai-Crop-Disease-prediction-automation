@@ -1,8 +1,7 @@
 import os
 from fastapi import APIRouter, Depends, UploadFile, File, Form
-from sqlalchemy.orm import Session
-from typing import List
-from config.database import get_db
+from supabase import Client
+from config.database import get_supabase
 from schemas import schemas
 from services.ai.disease_detector import DiseaseDetector
 from datetime import datetime
@@ -18,7 +17,7 @@ async def analyze_crop(
     file: UploadFile = File(...),
     mode: str = Form("direct"),
     enable_tta: bool = Form(False),
-    db: Session = Depends(get_db)
+    db: Client = Depends(get_supabase)
 ):
     if not file.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="Uploaded file is not an image.")
@@ -53,6 +52,39 @@ async def analyze_crop(
         prediction = detector.predict(file_path, preprocessing_mode=mode, enable_tta=enable_tta)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Crop analysis failed: {str(e)}")
+        
+    try:
+        # Upload to Supabase Storage
+        file_name_in_storage = f"{int(datetime.utcnow().timestamp())}_{file.filename}"
+        with open(file_path, "rb") as f:
+            # We must use proper kwargs for supabase python client
+            res = db.storage.from_("crop-images").upload(file_name_in_storage, f.read(), {"content-type": file.content_type})
+            
+        public_url = db.storage.from_("crop-images").get_public_url(file_name_in_storage)
+        
+        # Save to database
+        # Assuming a default dummy user_id for now as we don't have full auth setup yet.
+        # But we will leave it null if not provided since RLS might not strictly require it in our custom setup
+        db_record = {
+            "crop_type": prediction["crop"],
+            "image_path": public_url,
+            "detected_disease": prediction["condition"],
+            "confidence": float(prediction["confidence"]),
+            "severity": prediction["severity"],
+            "risk_level": prediction["risk"]
+        }
+        
+        db.table("crop_analyses").insert(db_record).execute()
+        
+    except Exception as e:
+        print(f"Warning: Failed to save to Supabase: {str(e)}")
+        # We still return the prediction even if saving fails
+    
+    # Optionally remove local file
+    try:
+        os.remove(file_path)
+    except:
+        pass
     
     return prediction
 
