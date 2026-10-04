@@ -41,6 +41,19 @@
   "what_to_do": "What should I do?",
   "history": "Crop Health History",
   "ask_ai_title": "Ask AgroNex",
-  "ask_ai_subtitle": "Your AI farming assistant",
-  "type_message": "Type your message..."
+  "ask_ai_subtitle": "Your AI farming assistant (Voice & Chat)",
+  "type_message": "Type your message or speak...",
+  "voice_message": "Voice Note",
+  "recording_label": "Recording voice...",
+  "stop_recording": "Save recording",
+  "cancel_recording": "Cancel",
+  "upload_audio": "Attach local audio file",
+  "audio_ready": "Audio file ready. Press Send to process.",
+  "mic_permission_denied": "Microphone permission denied. Please allow access in browser or upload an audio file.",
+  "listening_ai": "AgroNex is thinking & preparing voice reply...",
+  "listen_voice": "Listen",
+  "transcribed": "Transcribed",
+  "live_camera": "Live Camera",
+  "snap_photo": "Snap Photo",
+  "camera_permission_denied": "Camera permission denied. Please allow access in browser or choose a file."
 }
