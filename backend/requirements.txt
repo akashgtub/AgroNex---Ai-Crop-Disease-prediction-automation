@@ -10,3 +10,4 @@ numpy
 Pillow
 onnxruntime
 email-validator
+scikit-learn
