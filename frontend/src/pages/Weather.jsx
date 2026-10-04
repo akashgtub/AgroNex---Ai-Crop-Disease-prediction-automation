@@ -251,6 +251,16 @@ export default function Weather() {
               })}
             </div>
           </>
+        ) : weather && !weather.success ? (
+          <div className="bg-red-50 p-6 rounded-3xl border border-red-100 text-center">
+            <AlertTriangle className="text-red-400 mx-auto mb-3" size={32} />
+            <h3 className="text-red-800 font-bold mb-1">
+              {isTamil ? "நேரடி வானிலைத் தரவைப் பெற முடியவில்லை." : "Unable to fetch live weather data."}
+            </h3>
+            <p className="text-red-600 text-sm font-medium">
+              {weather.error || (isTamil ? "தரவு இல்லை" : "Data unavailable")}
+            </p>
+          </div>
         ) : null}
       </div>
     </div>
