@@ -11,3 +11,4 @@ Pillow
 onnxruntime
 email-validator
 scikit-learn
+google-auth

@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { Leaf } from 'lucide-react';
+import AgroNexGoogleLogin from '../features/googleAuth/GoogleLogin';
 
 export default function Login() {
   const { t } = useTranslation();
@@ -55,10 +56,8 @@ export default function Login() {
           <div className="h-px bg-gray-200 flex-1"></div>
         </div>
 
-        <div className="mt-6 flex justify-center gap-4">
-          <button className="w-12 h-12 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors">
-            <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-6 h-6" />
-          </button>
+        <div className="mt-6 flex justify-center">
+          <AgroNexGoogleLogin onSuccess={() => navigate('/dashboard')} />
         </div>
         
         <p className="text-center mt-8 text-sm text-gray-500">
