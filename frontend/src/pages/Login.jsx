@@ -161,7 +161,6 @@ export default function Login() {
 	<div className="mt-5 flex justify-center">
         <AgroNexGoogleLogin onSuccess={() => navigate('/dashboard')} />
 	</div>
-        </div>
 
         {/* Toggle between Login and Register */}
         <div className="mt-7 text-center text-xs text-slate-500">
