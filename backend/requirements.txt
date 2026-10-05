@@ -13,3 +13,5 @@ supabase
 scikit-learn
 google-auth
 requests
+
+sarvamai==0.1.35
