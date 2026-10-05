@@ -42,6 +42,7 @@ async def voice_chat(
             audio_bytes=audio_bytes,
             filename=filename,
             preferred_language=language or "ta",
+            content_type=file.content_type or "audio/wav",
         )
         return result
     except Exception as e:

@@ -88,7 +88,7 @@ class AIAssistant:
             logger.error(f"Error in chat completion: {e}")
             return "மன்னிக்கவும், பதிலை உருவாக்குவதில் சிக்கல் ஏற்பட்டது. மீண்டும் முயற்சிக்கவும்." if language == "ta" else "Sorry, there was an issue generating a response. Please try again."
 
-    def speech_to_text(self, audio_bytes: bytes, filename: str = "audio.wav") -> tuple[str, str]:
+    def speech_to_text(self, audio_bytes: bytes, filename: str = "audio.wav", content_type: str = "audio/wav") -> tuple[str, str]:
         if not self.client:
             raise RuntimeError("Sarvam client is not configured.")
 
@@ -96,14 +96,32 @@ class AIAssistant:
         if "." not in filename:
             filename = f"{filename}.wav"
 
+        ext = Path(filename).suffix.lower()
+        if not content_type or content_type.startswith("video/") or content_type == "application/octet-stream":
+            if ext == ".wav":
+                content_type = "audio/wav"
+            elif ext == ".webm":
+                content_type = "audio/webm"
+            elif ext == ".ogg":
+                content_type = "audio/ogg"
+            elif ext in [".mp4", ".m4a"]:
+                content_type = "audio/mp4"
+            elif ext == ".mp3":
+                content_type = "audio/mpeg"
+            else:
+                content_type = "audio/wav"
+
+        logger.info(f"Calling Sarvam STT with file: {filename}, size: {len(audio_bytes)} bytes, mime: {content_type}")
+
         response = self.client.speech_to_text.transcribe(
-            file=(filename, io.BytesIO(audio_bytes)),
+            file=(filename, io.BytesIO(audio_bytes), content_type),
             model="saaras:v4",
             language_code="unknown",
             mode="codemix",
         )
         detected_lang = getattr(response, "language_code", None) or "ta-IN"
         transcript = getattr(response, "transcript", "").strip()
+        logger.info(f"Sarvam STT success. Detected lang: {detected_lang}, Transcript: '{transcript}'")
         return detected_lang, transcript
 
     def text_to_speech(self, text: str, language_code: str = "ta-IN") -> str | None:
@@ -126,14 +144,14 @@ class AIAssistant:
             logger.error(f"TTS conversion failed: {e}")
         return None
 
-    def process_voice_chat(self, audio_bytes: bytes, filename: str = "audio.wav", preferred_language: str = "ta") -> dict:
+    def process_voice_chat(self, audio_bytes: bytes, filename: str = "audio.wav", preferred_language: str = "ta", content_type: str = "audio/wav") -> dict:
         # Step 1: Speech-to-Text (Saaras v4)
         detected_lang = "ta-IN" if "ta" in preferred_language else "en-IN"
         transcript = ""
         try:
-            detected_lang, transcript = self.speech_to_text(audio_bytes, filename=filename)
+            detected_lang, transcript = self.speech_to_text(audio_bytes, filename=filename, content_type=content_type)
         except Exception as e:
-            logger.error(f"STT processing failed: {e}")
+            logger.exception(f"STT processing failed for file '{filename}' ({len(audio_bytes)} bytes): {e}")
 
         if not transcript:
             fallback_msg = "மன்னிக்கவும், உங்கள் குரல் தெளிவாகக் கேட்கவில்லை. மீண்டும் பேசவும் அல்லது தட்டச்சு செய்யவும்." if "ta" in preferred_language else "Sorry, I could not hear any speech clearly. Please try again or type your question."
