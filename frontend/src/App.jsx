@@ -1,4 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { GoogleOAuthProvider } from '@react-oauth/google';
+import { GOOGLE_CLIENT_ID } from './features/googleAuth/googleAuth';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -11,7 +13,8 @@ import './i18n/i18n';
 
 function App() {
   return (
-    <Router>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID || ''}>
+      <Router>
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Home />} />
@@ -27,6 +30,7 @@ function App() {
         </Route>
       </Routes>
     </Router>
+    </GoogleOAuthProvider>
   );
 }
 
