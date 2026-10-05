@@ -4,7 +4,10 @@ import os
 import re
 from pathlib import Path
 from dotenv import load_dotenv
-from sarvamai import SarvamAI
+try:
+    from sarvamai import SarvamAI
+except ImportError:
+    SarvamAI = None
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +46,13 @@ class AIAssistant:
                 if self.api_key:
                     break
 
-        self.client = SarvamAI(api_subscription_key=self.api_key) if self.api_key else None
+        if self.api_key and SarvamAI is not None:
+            self.client = SarvamAI(api_subscription_key=self.api_key)
+        else:
+            self.client = None
+            if not SarvamAI:
+                logger.warning("sarvamai package is not installed; AI assistant features will operate in fallback mode.")
+
 
     def clean_for_tts(self, text: str) -> str:
         """Strip markdown symbols (asterisks, hashtags, bullets) so TTS reads smoothly."""
