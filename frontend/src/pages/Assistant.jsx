@@ -790,7 +790,7 @@ export default function Assistant() {
             <h2 className="font-bold text-lg leading-tight flex items-center gap-2">
               {t('ask_ai_title')}
               <span className="text-xs bg-green-500/30 text-green-200 border border-green-400/30 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <Sparkles size={10} /> Sarvam AI Voice & Vision
+                <Sparkles size={10} />AI Voice & Vision
               </span>
             </h2>
             <p className="text-green-100 text-xs">{t('ask_ai_subtitle')}</p>
